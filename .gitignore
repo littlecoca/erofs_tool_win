@@ -1,0 +1,34 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# ---- 测试产物（随时可由 tests\*.py 重新生成）----
+/test/
+*.rawtmp
+
+# ---- 演示镜像（体积大，用 python tests\make_demo_img.py 重新生成）----
+/示例镜像/
+
+# ---- 引擎原始发行包（可用 python tools\fetch_engine.py 重新下载）----
+/engine/*.zip
+
+# ---- 想让仓库只留源码、不提交第三方二进制？
+#      取消下面两行注释，使用者改用 tools\fetch_engine.py 自行获取引擎 ----
+# /engine/*.exe
+# /engine/*.dll
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# ---- 日志 ----
+*.log

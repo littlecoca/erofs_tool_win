@@ -1,21 +1,50 @@
-MIT License
+BSD Zero Clause License (0BSD)
 
-Copyright (c) 2026 littlecoca
+Copyright (c) 2026 imgtool contributors
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+SPDX-License-Identifier: 0BSD
+https://spdx.org/licenses/0BSD.html
+
+---
+
+为什么用 0BSD（而不是 MIT / Unlicense / CC0）
+--------------------------------------------
+
+* 它是**没有任何附加条件**的许可证：不用署名、不用保留版权声明、不用附带许可证文本，
+  商用、闭源、改名、再许可都随便。
+* **OSI 认证**、FSF 认定为自由软件且**与 GPL 兼容**——这点对本项目很重要，
+  因为 engine\ 里的 erofs-utils 是 GPL-2.0，本项目代码必须与 GPL 兼容才能一起分发。
+* 相比 Unlicense / CC0 这类"放弃版权、进入公有领域"的声明，
+  0BSD 是一个**标准授权条款**而不是版权放弃，在全球法域（包括中国大陆、
+  德国等不承认"任意放弃著作权"的地区）都更稳，企业法务也普遍接受
+  （不少公司明确禁止使用 Unlicense，理由是"无法确认已获得授权"）。
+* 代价：0BSD **不含专利授权条款**。如果你的项目涉及专利风险、需要明确的专利许可，
+  应改用 Apache-2.0（但它要求署名和变更声明，不如 0BSD 宽松）。
+
+本许可证只覆盖本项目的自有代码
+------------------------------
+
+以上 0BSD 仅适用于本项目的源代码与文档（`imgtool/`、`tests/`、`tools/`、
+各启动脚本、`*.md`）。
+
+`engine/` 目录下的可执行文件**不是**本项目的代码，而是独立的第三方程序，
+随本仓库一并分发，遵循各自的许可证：
+
+| 文件 | 许可证 |
+| --- | --- |
+| `engine/fsck.erofs.exe`、`engine/mkfs.erofs.exe`、`engine/dump.erofs.exe` | GPL-2.0 |
+| `engine/extract.erofs.exe` | GPL-2.0 |
+| `engine/cygwin1.dll` | LGPL-3.0 |
+
+本项目只在命令行层面调用这些独立程序。分发注意事项见 THIRD_PARTY_NOTICES.md。
