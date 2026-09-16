@@ -42,6 +42,18 @@
 * **文档**：README（含"从零复现本工程"完整指南与 11 条踩坑记录）、LICENSE（0BSD）、
   THIRD_PARTY_NOTICES、CHANGELOG、.gitignore、.gitattributes，
   以及文档自检脚本 `tools/check_docs.py`（校验锚点、相对链接与提到的文件是否存在）。
+* **许可证合规**：
+  * `LICENSE` 按组件区分写清楚 —— 本项目代码 `0BSD`；
+    `engine/` 二进制分别为 `GPL-2.0-or-later` 和 `LGPL-3.0-or-later`（含 Cygwin 链接例外）；
+    并说明为何 0BSD 能与 GPL 二进制聚合分发、分发者需要履行哪些义务；
+  * 新增 `LICENSES/` 目录，随附 GPL-2.0 / GPL-3.0 / LGPL-3.0 许可证全文
+    （`tools/fetch_licenses.py` 可重新获取）；
+  * `THIRD_PARTY_NOTICES.md` 补全到 tag/commit 级的源码获取点与"发布前逐项检查"清单；
+  * `engine/README.md` 补全这套 exe 的完整构建链路：上游 erofs-utils 源码 →
+    第三方构建工程（CMake 目标定义、静态链接库清单、Cygwin 兼容补丁）→
+    `build_cygwin.sh`（`x86_64-pc-cygwin-clang`）→ GitHub Actions 上的交叉编译 →
+    Release 资产 → 本项目的取用方式；并修正了原先"fragments / 元数据压缩已实测"
+    的不实陈述（这两类本机造不出样本，属未实测）。
 
 ### 已知限制
 

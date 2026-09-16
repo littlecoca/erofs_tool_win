@@ -1,4 +1,5 @@
 BSD Zero Clause License (0BSD)
+==============================
 
 Copyright (c) 2026 imgtool contributors
 
@@ -16,35 +17,73 @@ PERFORMANCE OF THIS SOFTWARE.
 SPDX-License-Identifier: 0BSD
 https://spdx.org/licenses/0BSD.html
 
----
+适用范围：本项目的自有代码与文档 —— `imgtool/`、`tests/`、`tools/`、
+根目录各启动脚本（`*.bat` / `*.cmd` / `*.py` / `*.pyw` / `*.ps1`）、`*.md`。
+每个源文件头部都带 `SPDX-License-Identifier: 0BSD`，便于机器识别。
 
-为什么用 0BSD（而不是 MIT / Unlicense / CC0）
---------------------------------------------
 
-* 它是**没有任何附加条件**的许可证：不用署名、不用保留版权声明、不用附带许可证文本，
+为什么用 0BSD
+-------------
+
+* **没有任何附加条件**：不用署名、不用保留版权声明、不用附带许可证文本，
   商用、闭源、改名、再许可都随便。
-* **OSI 认证**、FSF 认定为自由软件且**与 GPL 兼容**——这点对本项目很重要，
-  因为 engine\ 里的 erofs-utils 是 GPL-2.0，本项目代码必须与 GPL 兼容才能一起分发。
-* 相比 Unlicense / CC0 这类"放弃版权、进入公有领域"的声明，
-  0BSD 是一个**标准授权条款**而不是版权放弃，在全球法域（包括中国大陆、
-  德国等不承认"任意放弃著作权"的地区）都更稳，企业法务也普遍接受
-  （不少公司明确禁止使用 Unlicense，理由是"无法确认已获得授权"）。
-* 代价：0BSD **不含专利授权条款**。如果你的项目涉及专利风险、需要明确的专利许可，
-  应改用 Apache-2.0（但它要求署名和变更声明，不如 0BSD 宽松）。
+* **OSI 认证**、FSF 认定为自由软件，且**与 GPL 兼容**——这点对本项目是硬要求，
+  因为 `engine/` 里分发的是 GPL-2.0-or-later 的二进制，两者要能一起分发。
+* 相比 Unlicense / CC0 这类"放弃版权、进入公有领域"的声明，0BSD 是**标准授权条款**
+  而非版权放弃，在中国大陆、德国等不承认"任意放弃著作权"的法域更稳妥；
+  企业法务也普遍接受（不少公司明确禁止 Unlicense，理由是"无法确认已获得授权"）。
+* 代价：0BSD **不含专利授权**。若项目需要明确的专利许可，应改用 Apache-2.0
+  （但 Apache-2.0 要求署名、标注变更、附带 NOTICE，不如 0BSD 宽松）。
 
-本许可证只覆盖本项目的自有代码
-------------------------------
 
-以上 0BSD 仅适用于本项目的源代码与文档（`imgtool/`、`tests/`、`tools/`、
-各启动脚本、`*.md`）。
+engine/ 目录：第三方二进制，不适用上面的 0BSD
+=============================================
 
-`engine/` 目录下的可执行文件**不是**本项目的代码，而是独立的第三方程序，
-随本仓库一并分发，遵循各自的许可证：
+`engine/` 里的文件**不是**本项目的代码，而是随本仓库一并分发的独立第三方程序，
+各有各的许可证。本项目只是在命令行层面调用它们（用 `subprocess` 拉起
+`fsck.erofs.exe`），两者属于 GPL 术语中的**"聚合"（mere aggregation）**，
+不是派生作品——所以本项目的 0BSD 与它们的 GPL 可以共存。
 
-| 文件 | 许可证 |
-| --- | --- |
-| `engine/fsck.erofs.exe`、`engine/mkfs.erofs.exe`、`engine/dump.erofs.exe` | GPL-2.0 |
-| `engine/extract.erofs.exe` | GPL-2.0 |
-| `engine/cygwin1.dll` | LGPL-3.0 |
+| 文件 | 许可证（SPDX） | 来源 |
+| --- | --- | --- |
+| `engine/fsck.erofs.exe` | `GPL-2.0-or-later` | erofs-utils（解压主力） |
+| `engine/mkfs.erofs.exe` | `GPL-2.0-or-later` | erofs-utils |
+| `engine/dump.erofs.exe` | `GPL-2.0-or-later` | erofs-utils |
+| `engine/extract.erofs.exe` | `GPL-2.0-or-later` | sekaiacg/erofs-tools 自研工具（仓库声明 GPL-2.0） |
+| `engine/cygwin1.dll` | `LGPL-3.0-or-later`（含链接例外） | Cygwin 运行库 |
 
-本项目只在命令行层面调用这些独立程序。分发注意事项见 THIRD_PARTY_NOTICES.md。
+补充说明：erofs-utils 的 `lib/`、`include/` 目录采用
+**GPL-2.0+ 或 Apache-2.0 双许可**，其余文件为 **GPL-2.0+**；
+由于 `fsck/main.c`、`mkfs/main.c` 等只给出 GPL 选项，链接后的可执行文件整体
+按 **GPL-2.0-or-later** 分发。这些二进制**是怎么编出来的**、版本号、SHA256
+校验值与源码获取点，见 [engine/README.md](engine/README.md) 与
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+
+如果你要分发本仓库（含 engine/）
+--------------------------------
+
+需要履行 GPL-2.0 与 LGPL-3.0 的义务：
+
+1. **附上许可证全文**：本仓库已随附 [LICENSES/](LICENSES) 目录
+   （`GPL-2.0.txt`、`GPL-3.0.txt`、`LGPL-3.0.txt`），分发时不要删。
+2. **提供对应源码的获取方式**：写明上游项目、版本与获取地址
+   （[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 第 4 节已列出精确到
+   tag/commit 的地址）。商业分发建议直接把源码包一并附上，或提供 GPL-2.0
+   第 3 节所述的书面要约。
+3. **不要给这些二进制附加额外限制**，也不要声称它们由本项目授权。
+4. **保留来源与版权声明**：不要删除 `engine/README.md`、
+   [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 与各许可证文本。
+5. 如果你**修改**了 erofs-utils 源码再分发，修改后的二进制同样受
+   GPL-2.0-or-later 约束，必须一并提供你修改后的源码。
+
+
+想完全避开这些义务
+------------------
+
+```powershell
+python tools\fetch_engine.py     # 让使用者自行下载引擎到 engine\
+```
+
+并在 `.gitignore` 中取消注释 `/engine/*.exe` 与 `/engine/*.dll`，
+使仓库**只包含 0BSD 的源码**，由使用者自行获取第三方二进制。

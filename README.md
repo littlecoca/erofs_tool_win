@@ -6,7 +6,7 @@
 [![Python](https://img.shields.io/badge/python-3.7%2B-3776ab.svg)](#21-运行要求)
 [![Dependencies](https://img.shields.io/badge/dependencies-stdlib%20only-brightgreen.svg)](#5-目录结构)
 [![Engine](https://img.shields.io/badge/engine-erofs--utils%201.8.10-orange.svg)](#43-为什么用-cygwin-版-fsckerofs)
-[![License](https://img.shields.io/badge/license-0BSD%20%2B%20GPL--2.0%20engine-blue.svg)](#12-许可证与第三方组件)
+[![License](https://img.shields.io/badge/license-0BSD%20%2B%20GPL--2.0--or--later%20engine-blue.svg)](#12-许可证与第三方组件)
 
 > **English abstract** — `imgtool` is a Windows-native extractor for EROFS images (Android
 > `system.img` / `vendor.img` / `product.img`, ChromeOS partitions, …). It drives the **official
@@ -304,7 +304,8 @@ img_tool\
 ├─ imgtool_cli.py              命令行入口
 ├─ README.md                   本文档
 ├─ LICENSE                     本项目代码的许可证（0BSD）
-├─ THIRD_PARTY_NOTICES.md      引擎二进制（erofs-utils / Cygwin）的许可证与来源
+├─ THIRD_PARTY_NOTICES.md      引擎二进制（erofs-utils / Cygwin）的许可证、源码与分发义务
+├─ LICENSES\                   第三方许可证全文（GPL-2.0 / GPL-3.0 / LGPL-3.0）
 ├─ CHANGELOG.md                变更记录
 ├─ .gitignore / .gitattributes 忽略规则与行尾规则
 │
@@ -322,7 +323,7 @@ img_tool\
 │   ├─ mkfs.erofs.exe          造镜像（生成测试镜像用）
 │   ├─ extract.erofs.exe       第三方增强解包器（可导出 fs_config，本工具暂未使用）
 │   ├─ cygwin1.dll             Cygwin 运行库，必须与 exe 同目录
-│   ├─ README.md               引擎来源、版本、校验值、许可证
+│   ├─ README.md               引擎来源、构建链路、版本校验值与许可证
 │   └─ erofs-utils-…-Cygwin_x86_64.zip   原始发行包（可删，仅作留档）
 │
 ├─ 示例镜像\                   给手动测试用的演示镜像（由 tests\make_demo_img.py 生成）
@@ -342,6 +343,8 @@ img_tool\
 │
 ├─ tools\                      开发/调查用脚本（不影响运行）
 │   ├─ fetch_engine.py         下载并解包最新 Cygwin 版 erofs-utils
+│   ├─ fetch_licenses.py       下载第三方许可证全文到 LICENSES\
+│   ├─ verify_engine_provenance.py  审计引擎来历：本地 SHA256 + 上游 tag/脚本/补丁/CI/许可证
 │   ├─ check_docs.py           文档自检：README 锚点/相对链接/提到的文件是否存在
 │   ├─ add_spdx.py             给源码文件补 SPDX 许可证标识（幂等）
 │   ├─ probe_engine.py         探测引擎能力（帮助文本、各压缩算法、异常输入）
@@ -1038,12 +1041,48 @@ A：不能。`super.img` 是动态分区容器（LP metadata），里面才是�
 
 ## 12 许可证与第三方组件
 
-| 部分 | 许可证 | 说明 |
+| 部分 | 许可证（SPDX） | 说明 |
 | --- | --- | --- |
-| 本项目代码（`imgtool\`、`tests\`、`tools\`、各脚本、文档） | **0BSD** | 见 [LICENSE](LICENSE)，SPDX: `0BSD` |
-| `engine\fsck.erofs.exe`、`mkfs.erofs.exe`、`dump.erofs.exe` | **GPL-2.0** | 来自 [erofs-utils](https://github.com/erofs/erofs-utils)（Samsung / hsiangkao 等） |
-| `engine\extract.erofs.exe` | **GPL-2.0** | 来自 [sekaiacg/erofs-tools](https://github.com/sekaiacg/erofs-tools)（上游 erofs-utils 的衍生工具） |
-| `engine\cygwin1.dll` | **LGPL-3.0** | [Cygwin](https://cygwin.com/) 运行库 |
+| 本项目代码（`imgtool\`、`tests\`、`tools\`、各脚本、文档） | **`0BSD`** | 见 [LICENSE](LICENSE) |
+| `engine\fsck.erofs.exe`、`mkfs.erofs.exe`、`dump.erofs.exe` | **`GPL-2.0-or-later`** | 来自 [erofs-utils](https://github.com/erofs/erofs-utils) |
+| `engine\extract.erofs.exe` | **`GPL-2.0-or-later`** | 来自 [sekaiacg/erofs-tools](https://github.com/sekaiacg/erofs-tools) |
+| `engine\cygwin1.dll` | **`LGPL-3.0-or-later`**（含链接例外） | [Cygwin](https://cygwin.com/) 运行库 |
+
+许可证全文随仓库提供：[LICENSES/GPL-2.0.txt](LICENSES/GPL-2.0.txt)、
+[LICENSES/GPL-3.0.txt](LICENSES/GPL-3.0.txt)、[LICENSES/LGPL-3.0.txt](LICENSES/LGPL-3.0.txt)。
+版本、SHA256 校验值、构建方式与精确到 tag/commit 的源码获取点，见
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+### 这些 `.exe` 是怎么来的
+
+一句话：**官方 erofs-utils 的源码，被第三方构建项目在 GitHub 的 Ubuntu 机器上用
+"Cygwin 交叉工具链"交叉编译成 Windows 可执行文件。**
+
+```
+erofs/erofs-utils（GPL-2.0+，lib/ 另可选 Apache-2.0）
+        │  源码
+        ▼
+sekaiacg/erofs-tools（第三方构建工程，GPL-2.0）
+        │  · 收进 erofs-utils + lz4/zstd/xz/zlib/xxHash/libfuse/… 并锁定提交
+        │  · CMake 构建定义：file(GLOB fsck/*.c) → add_executable(fsck.erofs)，
+        │    把 liberofs 与各压缩库全部静态链进去
+        │  · build_cygwin.sh：cmake -DCMAKE_SYSTEM_NAME=CYGWIN
+        │    -DCMAKE_C_COMPILER=x86_64-pc-cygwin-clang … && ninja
+        │  · GitHub Actions 的 ubuntu-latest 上装交叉工具链后执行上述脚本
+        ▼
+erofs-utils-…-Cygwin_x86_64.zip（含 4 个 exe + cygwin1.dll）
+        │  本项目 tools\fetch_engine.py 下载并解包
+        ▼
+engine\  ← 被 imgtool 用 subprocess 调用
+```
+
+完整链路（含补丁清单、链接库清单、CI 任务名、校验值）写在
+[engine/README.md](engine/README.md)，并且可以用脚本逐条复核：
+
+```powershell
+python tools\verify_engine_provenance.py     # 23 项核对：本地 SHA256 + 上游 tag/脚本/补丁/CI/许可证
+python tools\verify_engine_provenance.py --offline   # 只校验本地文件
+```
 
 ### 为什么本项目用 0BSD
 
@@ -1051,7 +1090,7 @@ A：不能。`super.img` 是动态分区容器（LP metadata），里面才是�
 不需要附带许可证文本，商用 / 闭源 / 改名 / 再许可全都可以。
 
 * ✅ **OSI 认证**，FSF 认定为自由软件，且**与 GPL 兼容**——本项目必须与 GPL 兼容，
-  因为 `engine\` 里的 erofs-utils 是 GPL-2.0，两者要能一起分发。
+  因为 `engine\` 里分发的是 `GPL-2.0-or-later` 的二进制，两者要能一起分发。
 * ✅ 相比 Unlicense / CC0 这类"放弃版权、进入公有领域"的声明，0BSD 是**标准授权条款**
   而非版权放弃，在中国大陆、德国等不承认"任意放弃著作权"的法域更稳；
   企业法务也普遍接受（不少公司明令禁止 Unlicense，理由是"无法确认已获得授权"）。
@@ -1065,7 +1104,8 @@ A：不能。`super.img` 是动态分区容器（LP metadata），里面才是�
 
 * 保留 `engine\README.md` 与 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 中的
   来源、版本、许可证与源码链接；
-* 附上 GPL-2.0 / LGPL-3.0 许可证全文，并提供对应源码的获取方式（上游仓库链接 + 版本号即可）；
+* 一并提供 [LICENSES/](LICENSES) 里的许可证全文，以及对应源码的获取方式
+  （精确地址见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 第 4 节）；
 * 不要声称这些二进制由本项目授权。
 
 只想自己用、或者仓库里只提交 `tools\fetch_engine.py` 让用户自行下载引擎，都没有这些顾虑。
