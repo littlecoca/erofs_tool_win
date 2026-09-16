@@ -347,6 +347,7 @@ img_tool\
 │   ├─ fetch_engine.py         下载并解包最新 Cygwin 版 erofs-utils
 │   ├─ fetch_licenses.py       下载第三方许可证全文到 LICENSES\
 │   ├─ verify_engine_provenance.py  审计引擎来历：本地 SHA256 + 上游 tag/脚本/补丁/CI/许可证
+│   ├─ probe_pe.py             拆开 exe 看 PE 头 / 导入表 / 编译器指纹（实证 CMake 编了什么）
 │   ├─ check_docs.py           文档自检：README 锚点/相对链接/提到的文件是否存在
 │   ├─ add_spdx.py             给源码文件补 SPDX 许可证标识（幂等）
 │   ├─ probe_engine.py         探测引擎能力（帮助文本、各压缩算法、异常输入）
@@ -1098,7 +1099,8 @@ A：不能。`super.img` 是动态分区容器（LP metadata），里面才是�
    `/usr/x86_64-pc-cygwin/bin/cygwin1.dll` 拷到一起，统一时间戳后压成
    `erofs-utils-v1.8.10-gee46dd74-251217-Cygwin_x86_64.zip`，作为 GitHub Release 资产发布。
 
-**完整链路**（每个依赖的锁定提交、CMake 原文、4 个补丁改了什么、CI 步骤、自己重编的三种方式、
+**完整链路**（每个依赖的锁定提交、CMake 原文、4 个补丁改了什么、CI 步骤、
+**CMake 到底怎么把 `.c` 编成 `.exe`（命令行级别 + 产物实证）**、自己重编的三种方式、
 常见疑问、术语表）见 [**docs/ENGINE_PROVENANCE.md**](docs/ENGINE_PROVENANCE.md)。
 
 ```

@@ -80,6 +80,7 @@ Windows 可执行文件；本项目（③）下载成品并用 `subprocess` 调�
 .\engine\fsck.erofs.exe -V                           # 自报版本与可用压缩算法
 python tools\verify_engine_provenance.py             # 23 项审计：本地 SHA256 + 上游 tag/脚本/补丁/CI/许可证
 python tools\verify_engine_provenance.py --offline   # 只校验本地文件（不联网）
+python tools\probe_pe.py engine\fsck.erofs.exe       # 拆开 exe：PE 头 / 导入表 / 编译器指纹
 python tools\smoke_engine.ps1                        # 最小闭环：mkfs → fsck → 比 SHA256
 ```
 

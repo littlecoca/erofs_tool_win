@@ -19,6 +19,7 @@
   - [2.7 第 7 环 发布资产](#27-第-7-环-发布资产)
   - [2.8 第 8 环 本项目取用](#28-第-8-环-本项目取用)
   - [2.9 第 9 环 运行期调用](#29-第-9-环-运行期调用)
+  - [2.10 第 10 环 CMake 到底是怎么编出 exe 的](#210-第-10-环-cmake-到底是怎么编出-exe-的)
 - [3 版本与校验值](#3-版本与校验值)
 - [4 自己验证](#4-自己验证)
 - [5 从源码自己编一份](#5-从源码自己编一份)
@@ -317,10 +318,137 @@ creationflags = CREATE_NO_WINDOW   # pythonw 启动时不要闪黑框
 > 连删都删不掉。设成 `sys` 后写成 `"!<symlink>" + UTF-16LE 目标`的普通文件，
 > 我们就能读出来再还原成真链接 / 目录联接。细节见 README 踩坑记录 T1。
 
+### 2.10 第 10 环 CMake 到底是怎么编出 exe 的
+
+前面几环说了"用 CMake + Cygwin 交叉工具链"，这一节把它拆到命令行级别：
+`.c` 是怎么一步步变成 `fsck.erofs.exe` 的，以及**怎么从编好的 exe 里反推出这些步骤**。
+
+#### 2.10.1 CMake 的三个阶段
+
+CMake 不是编译器，它只负责"生成构建文件"，真正干活的是编译器和 Ninja：
+
+```
+① configure（配置）   cmake -S ./build/cmake -B ./out -G Ninja -DCMAKE_SYSTEM_NAME=CYGWIN …
+        · 读 CMakeLists.txt
+        · 探测编译器能力：cmake/check.cmake 里用 try_compile 逐个试
+          “这个 flag 编译器认不认”，不认就不加（所以同一份构建脚本能跨平台用）
+        · 定下目标平台、工具链、编译/链接选项
+
+② generate（生成）    →  产出 ./out/build.ninja（+ CMakeCache.txt、compile_commands.json）
+        · 每个 .c/.cpp 文件变成一条编译规则
+        · 每个 add_executable() 变成一条链接规则，依赖关系也写进去了
+
+③ build（构建）       ninja -C ./out
+        · 先编依赖库（.a 静态库），再编 exe，最后链接（增量构建只重编改动的文件）
+```
+
+#### 2.10.2 目标平台决定了"产物长什么样"
+
+`-DCMAKE_SYSTEM_NAME=CYGWIN` 这一句的影响贯穿全程：
+
+| CMake 变量 | CYGWIN 下的值 | 后果 |
+| --- | --- | --- |
+| `CMAKE_EXECUTABLE_SUFFIX` | `.exe` | `add_executable(fsck.erofs)` 产出 `fsck.erofs.exe` |
+| `CMAKE_STATIC_LIBRARY_SUFFIX` | `.a` | 依赖库编成 `liberofs.a`、`liblz4.a`… |
+| `CMAKE_SHARED_LIBRARY_SUFFIX` | `.dll` | 共享库后缀（本项目不用） |
+| 顶层 `CMakeLists.txt` 的分支 | `if (CMAKE_SYSTEM_NAME MATCHES "CYGWIN")` | 追加 `-Wl,-s,-x,--gc-sections` |
+| `erofs_tools.cmake` 的分支 | `if (CYGWIN)` | 链接库清单追加 `ext2_uuid`、`iconv`、`ntdll` |
+
+如果不指定 `CMAKE_SYSTEM_NAME`，CMake 会认为"在本机（Linux）构建"，产物就是 Linux ELF，
+名字也不会带 `.exe` —— 这正是"交叉编译"的关键开关。
+
+#### 2.10.3 三条命令：编译 → 归档 → 链接
+
+以 `fsck.erofs` 为例（**下面命令行是按 CMake 的生成规则还原的**；
+想看逐字不差的原始命令，自己构建时加 `ninja -v`，或看 CMake 自动生成的
+`compile_commands.json`）：
+
+**第 1 步 编译（每个 .c 一条命令）**
+
+```bash
+x86_64-pc-cygwin-clang \
+    -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE \
+    -Os -D_FORTIFY_SOURCE=2 -fstack-protector-strong \
+    -fdata-sections -ffunction-sections -fvisibility=hidden \
+    -std=gnu11 \
+    -I<erofs-utils>/include -I<erofs-utils>/lib -I<依赖头文件目录>… \
+    -c <erofs-utils>/fsck/main.c \
+    -o out/…/fsck/main.c.o
+```
+
+`-fdata-sections -ffunction-sections` 把每个函数/数据放到独立节区，
+是为了后面链接时能按节丢弃（配合 `--gc-sections`）。
+
+**第 2 步 归档（每个依赖库一条命令）**
+
+```bash
+x86_64-pc-cygwin-ar qc liberofs.a <erofs-utils/lib/*.o>      # 静态库就是一堆 .o 的压缩包
+x86_64-pc-cygwin-ar qc liblz4.a  <lz4/*.o>
+x86_64-pc-cygwin-ar qc libzstd.a <zstd/*.o>
+…                                                            # xz / zlib / pcre2 / xxhash / selinux / libbase / liblog …
+```
+
+**第 3 步 链接（每个 exe 一条命令）**
+
+```bash
+x86_64-pc-cygwin-clang \
+    out/…/fsck/*.o \                          # ① fsck/ 下所有源文件的目标文件
+    liberofs.a libcutils.a libbase.a liblog.a libselinux.a \
+    liblz4.a liblzma.a libz.a libzstd.a libpcre2.a libxxhash.a \
+    -lext2_uuid -liconv -lntdll \             # ② CYGWIN 分支追加的三个库
+    -Wl,-s -Wl,-x -Wl,--gc-sections \         # ③ CYGWIN 分支追加的链接标志
+    -o out/erofs-tools/fsck.erofs.exe
+```
+
+> CMake 会把 `target_link_libraries(fsck.erofs erofs_static lz4_static …)` 里的
+> **目标名**翻译成对应的 `.a` 文件路径（并自动补 `-L` 搜索路径）。
+
+#### 2.10.4 链接器最后做了什么（从产物反推）
+
+把编出来的 `fsck.erofs.exe` 拆开看，就能验证上面每一步都生效了
+（用 `python tools\probe_pe.py engine\fsck.erofs.exe` 可复现）：
+
+| 观察到的现象 | 说明它对应哪一步 |
+| --- | --- |
+| `PE32+（64 位）`、机器类型 `AMD64`、子系统 `WINDOWS_CUI`（控制台） | 因为目标是 Cygwin/x86_64，且是命令行程序 |
+| **只导入 2 个 DLL：`cygwin1.dll`（229 个函数）+ `KERNEL32.dll`（7 个函数）** | ② 的静态链接生效了 —— lz4/lzma/zlib/zstd/pcre2/xxhash/selinux 全部进了 exe 本体 |
+| `cygwin1.dll` 那 229 个函数（`__errno`、`__getreent`、`__locale_*`、`open`、`read`…） | 链接时**隐式**带进了 Cygwin 的启动代码与系统调用层（`crt0.o` + `libcygwin.a`），这就是"必须带这个 DLL"的根本原因 |
+| `KERNEL32.dll` 那 7 个（`RaiseException`、`RtlCaptureContext`、`RtlLookupFunctionEntry`、`RtlUnwindEx`…） | 编译器运行时（异常/栈展开支持）直接调用的 Windows 原生 API |
+| **COFF 符号表已被去掉**（0 个符号） | ③ 的 `-Wl,-s` 生效，所以反编译看不到函数名 |
+| 没有调试目录 | `CMAKE_BUILD_TYPE=Release`，没带 `-g` |
+| `.text .data .rdata .pdata .xdata .bss .idata .rsrc .reloc` 九个节区 | 常规 PE 布局；`.pdata`/`.xdata` 是 x64 的异常处理表 |
+| 带 `.rsrc` 节 | 里面是 Windows 清单（声明不需要 UAC 提权等） |
+| `mkfs.erofs.exe` 与 `fsck.erofs.exe` 的链接时间戳完全相同 | 同一次 `ninja` 运行里连续链出来的 |
+| 二进制里能搜到 `cygwin/cygwin-libc++/src/libcxxabi/src/cxa_personality.cpp` | 工具链连了 Cygwin 交叉环境自带的 libc++abi |
+
+#### 2.10.5 交叉工具链到底"交叉"在哪
+
+关键在于 `x86_64-pc-cygwin-clang` 这个**驱动**：它把"目标三元组 `x86_64-pc-cygwin`"
+连同 Cygwin 的 sysroot（头文件、`libcygwin.a`、`crt0.o`、`libntdll.a` 等）绑在一起，
+于是同一条 `clang -c/-o` 命令在 Linux 上跑，产出的却是 Windows PE 文件。
+
+`cygwin-xclang` 这个 Debian 包（社区维护）提供的就是这套驱动 + sysroot；
+Cygwin 官方运行库 `cygwin1.dll` 也在其中（所以 `build_cygwin.sh` 能直接
+从 `/usr/x86_64-pc-cygwin/bin/` 把它拷进发布包）。
+
+#### 2.10.6 想自己看真实命令行
+
+```bash
+# 方式 1：构建时把命令行打印出来
+ninja -C ./out -v
+
+# 方式 2：CMake 会自动导出编译数据库（顶层 CMakeLists 里设了
+#         CMAKE_EXPORT_COMPILE_COMMANDS ON）
+cat ./out/compile_commands.json
+
+# 方式 3：不重新构建，直接从产物反推（本项目自带脚本）
+python tools\probe_pe.py engine\fsck.erofs.exe
+python tools\probe_pe.py engine\cygwin1.dll      # 顺带能看到 Cygwin 本体是 GCC 11.4.0 编的
+```
+
 ---
 
 ## 3 版本与校验值
-
 本仓库当前对应的引擎：
 
 | 项 | 值 |
