@@ -54,6 +54,18 @@
     `build_cygwin.sh`（`x86_64-pc-cygwin-clang`）→ GitHub Actions 上的交叉编译 →
     Release 资产 → 本项目的取用方式；并修正了原先"fragments / 元数据压缩已实测"
     的不实陈述（这两类本机造不出样本，属未实测）。
+  * 新增 **`docs/ENGINE_PROVENANCE.md`**：把"这些 exe 是怎么来的"写成九个环节的详解
+    （上游源码 / 构建工程与 11 个依赖的锁定提交 / CMake 目标原文 / 4 个 Cygwin 补丁内容 /
+    构建脚本逐行解释 / CI 步骤 / 发布资产 / 本项目取用 / 运行期调用参数），
+    外加版本校验值、三层自查方法、**从源码自己重编的三种方式**、8 条常见疑问与术语表。
+  * README 与 `engine/README.md` 里那句概括改为**明确区分三方**：
+    ① 官方上游 erofs-utils（kernel.org 主开发树 / GitHub 官方镜像）、
+    ② 第三方构建工程 sekaiacg/erofs-tools（只打包、不写文件系统代码）、
+    ③ 本项目 imgtool（只管下载与调用），并配"四步构建过程"说明。
+    `engine/README.md` 相应收敛为摘要 + 指向详解文档，避免两份内容各自漂移。
+  * `tools/check_docs.py` 升级：从只查 README 扩展为查全部 6 份文档
+    （README / CHANGELOG / THIRD_PARTY_NOTICES / LICENSE / engine/README / docs/*.md），
+    校验锚点、相对链接与正文提到的文件路径是否都存在。
 
 ### 已知限制
 

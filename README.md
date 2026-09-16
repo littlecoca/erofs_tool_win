@@ -306,6 +306,8 @@ img_tool\
 ├─ LICENSE                     本项目代码的许可证（0BSD）
 ├─ THIRD_PARTY_NOTICES.md      引擎二进制（erofs-utils / Cygwin）的许可证、源码与分发义务
 ├─ LICENSES\                   第三方许可证全文（GPL-2.0 / GPL-3.0 / LGPL-3.0）
+├─ docs\
+│   └─ ENGINE_PROVENANCE.md    引擎来历详解：这 4 个 exe 是谁、怎么编出来的、怎么核对、怎么自己重编
 ├─ CHANGELOG.md                变更记录
 ├─ .gitignore / .gitattributes 忽略规则与行尾规则
 │
@@ -323,7 +325,7 @@ img_tool\
 │   ├─ mkfs.erofs.exe          造镜像（生成测试镜像用）
 │   ├─ extract.erofs.exe       第三方增强解包器（可导出 fs_config，本工具暂未使用）
 │   ├─ cygwin1.dll             Cygwin 运行库，必须与 exe 同目录
-│   ├─ README.md               引擎来源、构建链路、版本校验值与许可证
+│   ├─ README.md               引擎说明：用途、版本校验值、许可证（构建链路详解见 docs\）
 │   └─ erofs-utils-…-Cygwin_x86_64.zip   原始发行包（可删，仅作留档）
 │
 ├─ 示例镜像\                   给手动测试用的演示镜像（由 tests\make_demo_img.py 生成）
@@ -1055,34 +1057,122 @@ A：不能。`super.img` 是动态分区容器（LP metadata），里面才是�
 
 ### 这些 `.exe` 是怎么来的
 
-一句话：**官方 erofs-utils 的源码，被第三方构建项目在 GitHub 的 Ubuntu 机器上用
-"Cygwin 交叉工具链"交叉编译成 Windows 可执行文件。**
+先分清三方，别混：
+
+| 角色 | 是谁 | 地址 | 干什么 |
+| --- | --- | --- | --- |
+| **① 官方上游** | **erofs-utils** —— EROFS 文件系统（Android `system` 分区用的只读文件系统）的**官方用户态工具集**，由 EROFS 作者（Xiang Gao / `hsiangkao`）等人维护 | 主开发树 <https://git.kernel.org/pub/scm/linux/kernel/git/xiang/erofs-utils.git><br>官方 GitHub 镜像 <https://github.com/erofs/erofs-utils> | 写 `fsck.erofs` / `mkfs.erofs` / `dump.erofs` 的**全部源码** |
+| **② 第三方构建工程** | **sekaiacg/erofs-tools** —— 个人（sekaiacg）维护的**打包/构建工程**，不是 erofs-utils 的官方发行渠道 | <https://github.com/sekaiacg/erofs-tools> | 它**不写文件系统代码**，只负责把 ① 的源码连同依赖编成各平台成品并发布 |
+| **③ 本项目** | **imgtool** | <https://github.com/littlecoca/erofs_tool_win> | 下载 ② 的 Windows 成品，套一层好用的 GUI/CLI |
+
+> **一句话**：本项目 `engine\` 里的 `.exe`，是**官方项目 erofs-utils（①）的源码**，
+> 被**第三方构建工程 sekaiacg/erofs-tools（②）**在 **GitHub Actions 的 Ubuntu 机器**上，
+> 用**目标平台为 Cygwin 的 Clang 交叉编译器**编译成 Windows 可执行文件；
+> 本项目（③）只下载成品、用 `subprocess` 调起来。
+>
+> 换句话说：这几个 exe **从来没有在 Windows 上编译过**——编译它们的是 Linux，
+> 只是"目标平台"设置成了 Cygwin（`x86_64-pc-cygwin`）。
+
+**② 到底是怎么构建的**（四步，细节见 [详解文档](docs/ENGINE_PROVENANCE.md)）：
+
+1. **收源码**：把 ① 的 erofs-utils 源码，外加 11 个依赖
+   （lz4 / zstd / xz / zlib / xxHash / libfuse / e2fsprogs / pcre / selinux / libcxx），
+   全部以 git submodule 形式收进自己的仓库并**锁定提交**，另开 `build/cmake/` 一套 CMake 构建系统。
+2. **定目标**：`build/cmake/erofs-tools/erofs_tools.cmake` 里逐个工具声明目标 ——
+   `file(GLOB fsck/*.c)` → `add_executable(fsck.erofs …)`，mkfs/dump 同理；
+   并把 liberofs 与各压缩库**全部静态链接**进去。
+3. **交叉编译**：在 GitHub Actions 的 `ubuntu-latest` 上
+   `apt install cygwin cygwin-gcc cygwin-libiconv cygwin-xclang cygwin-libc++`
+   （社区打包的 Cygwin 交叉工具链），然后跑 `build_cygwin.sh`：
+
+   ```bash
+   cmake -S ./build/cmake -B ./out -G Ninja \
+         -DCMAKE_SYSTEM_NAME="CYGWIN" \
+         -DCMAKE_C_COMPILER="x86_64-pc-cygwin-clang" \
+         -DCMAKE_CXX_COMPILER="x86_64-pc-cygwin-clang++" \
+         -DCMAKE_BUILD_TYPE="Release" -DMAX_BLOCK_SIZE="4096"
+   ninja -C ./out
+   ```
+
+4. **打包发布**：把 `*.erofs.exe` 四个成品 + 交叉 sysroot 里的
+   `/usr/x86_64-pc-cygwin/bin/cygwin1.dll` 拷到一起，统一时间戳后压成
+   `erofs-utils-v1.8.10-gee46dd74-251217-Cygwin_x86_64.zip`，作为 GitHub Release 资产发布。
+
+**完整链路**（每个依赖的锁定提交、CMake 原文、4 个补丁改了什么、CI 步骤、自己重编的三种方式、
+常见疑问、术语表）见 [**docs/ENGINE_PROVENANCE.md**](docs/ENGINE_PROVENANCE.md)。
 
 ```
-erofs/erofs-utils（GPL-2.0+，lib/ 另可选 Apache-2.0）
-        │  源码
-        ▼
-sekaiacg/erofs-tools（第三方构建工程，GPL-2.0）
-        │  · 收进 erofs-utils + lz4/zstd/xz/zlib/xxHash/libfuse/… 并锁定提交
-        │  · CMake 构建定义：file(GLOB fsck/*.c) → add_executable(fsck.erofs)，
-        │    把 liberofs 与各压缩库全部静态链进去
-        │  · build_cygwin.sh：cmake -DCMAKE_SYSTEM_NAME=CYGWIN
-        │    -DCMAKE_C_COMPILER=x86_64-pc-cygwin-clang … && ninja
-        │  · GitHub Actions 的 ubuntu-latest 上装交叉工具链后执行上述脚本
-        ▼
-erofs-utils-…-Cygwin_x86_64.zip（含 4 个 exe + cygwin1.dll）
-        │  本项目 tools\fetch_engine.py 下载并解包
-        ▼
-engine\  ← 被 imgtool 用 subprocess 调用
+①  erofs/erofs-utils                       上游源码（C 语言，GPL-2.0-or-later）
+    fsck/main.c → fsck.erofs    mkfs/main.c → mkfs.erofs    dump/main.c → dump.erofs
+    lib/、include/ → liberofs（lz4 / lzma / deflate / zstd 解码、inode、xattr）
+    lib/ 与 include/ 采用 GPL-2.0+ 或 Apache-2.0 双许可，其余文件为 GPL-2.0+
+                    │  源码 + 11 个依赖（lz4/zstd/xz/zlib/xxHash/libfuse/
+                    │  e2fsprogs/pcre/selinux/libcxx），全部以 submodule 锁定提交
+                    ▼
+②  sekaiacg/erofs-tools                    第三方构建工程（GPL-2.0）
+    · 用 CMake（build/cmake/）替代上游 autotools，逐库描述怎么编
+    · 构建定义 build/cmake/erofs-tools/erofs_tools.cmake：
+          file(GLOB fsck_srcs "${PROJECT_ROOT_DIR}/fsck/*.c")
+          add_executable(fsck.erofs ${fsck_srcs})
+          target_link_libraries(fsck.erofs  erofs_static cutils base log selinux
+                               lz4_static liblzma z_static libzstd_static pcre2 xxhash
+                               ext2_uuid iconv  ntdll)     # 后三个是 CYGWIN 追加的
+      → 所有依赖**静态链接**，所以单个 exe 只有 ~2 MB 却支持全部压缩算法，
+        运行时除 cygwin1.dll 不依赖任何其它 DLL
+    · 4 个 Cygwin 兼容补丁（build/cmake/lib/patch/cygwin/）：
+        给 Android libbase/liblog 和 libselinux 的 #if 补上 `|| defined(__CYGWIN__)`，
+        以及把 __selinux_once 换成 pthread_once ——
+        核心的 fsck/mkfs/dump/lib C 代码**未改动**
+                    │  build_cygwin.sh
+                    ▼
+③  build_cygwin.sh                         构建脚本
+    cmake -S ./build/cmake -B ./out -G Ninja \
+          -DCMAKE_SYSTEM_NAME="CYGWIN" \
+          -DCMAKE_C_COMPILER="x86_64-pc-cygwin-clang" \
+          -DCMAKE_CXX_COMPILER="x86_64-pc-cygwin-clang++" \
+          -DCMAKE_BUILD_TYPE="Release" -DMAX_BLOCK_SIZE="4096" -DENABLE_FULL_LTO="OFF"
+    ninja -C ./out
+    cp -af $BUILD/*.erofs.exe $TARGET_DIR_PATH                     # 4 个 exe
+    cp -af /usr/x86_64-pc-cygwin/bin/cygwin1.dll $TARGET_DIR_PATH  # 交叉 sysroot 里的运行库
+    touch -c -d "2009-01-01 00:00:00" $TARGET_DIR_PATH/*           # 统一时间戳便于比对
+    注：CMAKE_SYSTEM_NAME=CYGWIN 会让顶层 CMakeLists 走 CYGWIN 分支，加
+        -Wl,-s,-x,--gc-sections（strip + 去死代码）并追加 ext2_uuid/iconv/ntdll
+                    │  谁执行？
+                    ▼
+④  GitHub Actions .github/workflows/build-erofs-utils.yml
+    触发：push 到 dev 分支 / 手动 workflow_dispatch
+    四个并行 job：Build-android · Build-on-linux · **Build-cygwin** · Build-on-macOS
+    Build-cygwin 跑在 ubuntu-latest 上：
+        sudo apt install cygwin cygwin-gcc cygwin-libiconv cygwin-xclang cygwin-libc++
+        chmod +x build_cygwin.sh && ./build_cygwin.sh
+        → 上传 target/Cygwin_x86_64/erofs-utils-v*/
+    release job 收集各平台产物并发布 Release
+                    ▼
+⑤  erofs-utils-v1.8.10-gee46dd74-251217-Cygwin_x86_64.zip   (5 146 583 字节)
+    里面就 5 个文件：fsck.erofs.exe · mkfs.erofs.exe · dump.erofs.exe ·
+                     extract.erofs.exe · cygwin1.dll
+    资产名里的 gee46dd74 = 构建时 git describe 出的上游提交短哈希（exe -V 也这么报）
+                    │  tools/fetch_engine.py：查 API 取最新 release →
+                    │  挑名字含 Cygwin_x86_64 的资产 → 下载 → 解包
+                    ▼
+⑥  engine\                                 ← imgtool 用 subprocess 调用：
+    参数：--extract=<输出目录> [--offset=N] -d2 <镜像>（路径一律转成正斜杠）
+    环境：CYGWIN=winsymlinks:sys（让符号链接落成可读文件而非 WSL 重解析点）
+          LC_ALL=C.UTF-8、PATH 前置 engine 目录
+    cwd = engine 目录（保证 cygwin1.dll 能被找到）；CREATE_NO_WINDOW 不弹黑框
 ```
 
-完整链路（含补丁清单、链接库清单、CI 任务名、校验值）写在
-[engine/README.md](engine/README.md)，并且可以用脚本逐条复核：
+**怎么自己核对**（三层，从轻到重）：
 
 ```powershell
-python tools\verify_engine_provenance.py     # 23 项核对：本地 SHA256 + 上游 tag/脚本/补丁/CI/许可证
-python tools\verify_engine_provenance.py --offline   # 只校验本地文件
+.\engine\fsck.erofs.exe -V                    # ① 自报 1.8.10-gee46dd74 + 可用压缩算法
+Get-FileHash .\engine\fsck.erofs.exe -Algorithm SHA256   # ② 比对第 3 节的 SHA256 表
+python tools\verify_engine_provenance.py      # ③ 23 项审计：对着上游核 tag/资产大小/
+                                              #    构建脚本/补丁/CI/上游许可证 + 本地哈希
+python tools\verify_engine_provenance.py --offline       # 只校验本地文件（不联网）
 ```
+
+审计脚本当前 **23 项全部 PASS**。
 
 ### 为什么本项目用 0BSD
 
